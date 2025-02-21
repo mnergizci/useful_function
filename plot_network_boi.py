@@ -212,13 +212,13 @@ def plot_network_upd(ifgdates, bperp, ifgdir, pngfile, datatype, firstdate = dt.
         plt.ylabel('Bperp [m]')
     #
     # 2022-04-19 adding dots of 'existing epochs'
-    # epochdates = s1.get_epochs_for_frame(frame, firstdate.date(), lastdate.date(), returnAsDate = True)
-    # for imd in imdates_dt:
-    #     imdd = imd.date()
-    #     if imdd in epochdates:
-    #         #print('debug - found and removed ok: '+str(imdd))
-    #         epochdates.remove(imdd)
-    # ax.scatter(epochdates,np.zeros(len(epochdates)), facecolors='none', edgecolors='red')
+    epochdates = s1.get_epochs_for_frame(frame, firstdate.date(), lastdate.date(), returnAsDate = True)
+    for imd in imdates_dt:
+        imdd = imd.date()
+        if imdd in epochdates:
+            #print('debug - found and removed ok: '+str(imdd))
+            epochdates.remove(imdd)
+    ax.scatter(epochdates,np.zeros(len(epochdates)), facecolors='none', edgecolors='red')
     # adding timestamp
     timestamp = 'updated: '+str(dt.datetime.now().strftime("%Y-%m-%d %I:%M:%S"))
     plt.title(frame+', '+timestamp)

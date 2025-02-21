@@ -2,21 +2,31 @@
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 <frames_file>"
+    echo "Usage: $0 --batch <batch2|batch3> <frames_file>"
     exit 1
 }
 
-# Check if at least one argument is provided
-if [ $# -lt 1 ]; then
+# Check if at least two arguments are provided
+if [ $# -lt 2 ]; then
     usage
 fi
 
 # Default values
+batch_option=""
 frames_file=""
 
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --batch)
+            if [[ "$2" == "batch2" || "$2" == "batch3" ]]; then
+                batch_option="$2"
+                shift 2
+            else
+                echo "Error: Invalid batch option. Use 'batch2' or 'batch3'."
+                usage
+            fi
+            ;;
         -*)
             echo "Unknown option: $1"
             usage
@@ -28,8 +38,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate mandatory argument
-if [[ -z "$frames_file" ]]; then
+# Validate mandatory arguments
+if [[ -z "$batch_option" || -z "$frames_file" ]]; then
     usage
 fi
 
@@ -49,7 +59,7 @@ while read -r i; do
 
     # Check if directory exists before executing
     if [ -d "$i" ]; then
-        tmux new-session -d -s "$session_name" "cd '$i' && framebatch_gapfill.sh -b -o 2"
+        tmux new-session -d -s "$session_name" "cd '$i' && $batch_option; framebatch_gapfill.sh -b -o 2"
     else
         echo "Skipping $i: Directory does not exist."
     fi

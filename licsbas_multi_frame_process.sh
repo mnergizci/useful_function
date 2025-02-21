@@ -1,8 +1,8 @@
 #!/bin/bash
-
+##Muhammet Nergizci, COMET, University of Leeds-2025
 # Function to display usage
 usage() {
-    echo "Usage: $0 <frames_file> [-s start_date] [-e end_date] [--sbovl] [--eqoff]"
+    echo "Usage: $0 <frames_file> [-s start_date] [-e end_date] [--local] [--sbovl] [--eqoff]"
     exit 1
 }
 
@@ -17,6 +17,7 @@ start_date=""
 end_date=""
 sboi_flag=""
 eqoff_flag=""
+local_flag=""
 
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
@@ -28,6 +29,10 @@ while [[ $# -gt 0 ]]; do
         -e|--end-date)
             end_date="$2"
             shift 2
+            ;;
+        --local)
+            local_flag="--local"
+            shift
             ;;
         --sbovl)
             sboi_flag="--sbovl"
@@ -71,25 +76,23 @@ while read -r i; do
     session_name="${i}_${current_dir_suffix}"
     echo "Starting session: $session_name"
 
-    if [[ "$sboi_flag" == "--sbovl" && -n "$eqoff_flag" ]]; then
-        # Run with SBOI and eqoff options
-        tmux new-session -d -s "$session_name" \
-        "licsbas_local; licsar2licsbas_testing.sh -W -M 10 -b -n 4 -T -E 6 '$i' '$start_date' '$end_date' >> '${log_dir}/${i}_out.log' 2>> '${log_dir}/${i}_err.log' && echo 'Job for $i completed; bash'"
-    
-    elif [[ "$sboi_flag" == "--sbovl" ]]; then
-        # Run with only SBOI option
-        tmux new-session -d -s "$session_name" \
-        "licsbas_local; licsar2licsbas_testing.sh -W -M 10 -b -n 4 -T '$i' '$start_date' '$end_date' >> '${log_dir}/${i}_out.log' 2>> '${log_dir}/${i}_err.log' && echo 'Job for $i completed; bash'"
-    
-    elif [[ -n "$eqoff_flag" ]]; then
-        # Run with only eqoff option
-        tmux new-session -d -s "$session_name" \
-        "licsbas_local; licsar2licsbas_testing.sh -M 10 -g -n 4 -W -T -i -e -u -t 0 -C 0.2 -d -E 6 -p '$i' '$start_date' '$end_date' >> '${log_dir}/${i}_out.log' 2>> '${log_dir}/${i}_err.log' && echo 'Job for $i completed; bash'"
-    
-    elif [[ -z "$sboi_flag" && -z "$eqoff_flag" ]]; then
-        # Run without SBOI or eqoff
-        tmux new-session -d -s "$session_name" \
-        "licsbas_local; licsar2licsbas_testing.sh -M 10 -g -n 4 -W -T -i -e -u -t 0 -C 0.2 -d -p '$i' '$start_date' '$end_date' >> '${log_dir}/${i}_out.log' 2>> '${log_dir}/${i}_err.log' && echo 'Job for $i completed; bash'"
+    tmux_command=""
+    if [[ -n "$local_flag" ]]; then
+        tmux_command="licsbas_local; "
     fi
+
+    if [[ "$sboi_flag" == "--sbovl" && -n "$eqoff_flag" ]]; then
+        tmux_command+="licsar2licsbas_testing.sh -W -M 10 -b -n 4 -T -E 6 '$i' '$start_date' '$end_date'"
+    elif [[ "$sboi_flag" == "--sbovl" ]]; then
+        tmux_command+="licsar2licsbas_testing.sh -W -M 10 -b -n 4 -T '$i' '$start_date' '$end_date'"
+    elif [[ -n "$eqoff_flag" ]]; then
+        tmux_command+="licsar2licsbas.sh -M 10 -g -n 4 -W -N -T -i -e -u -t 0 -C 0.2 -d -E 6 -p '$i' '$start_date' '$end_date'"
+    else
+        tmux_command+="licsar2licsbas.sh -M 10 -g -n 4 -W -N -T -i -e -u -t 0 -C 0.2 -d -p '$i' '$start_date' '$end_date'"
+    fi
+
+    tmux_command+=" >> '${log_dir}/${i}_out.log' 2>> '${log_dir}/${i}_err.log' && echo 'Job for $i completed; bash'"
+    # echo "Command: $tmux_command"
+    tmux new-session -d -s "$session_name" "$tmux_command"
 
 done < "$frames_file"
