@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from lics_unwrap import *
 import framecare as fc
 from scipy import ndimage 
@@ -11,46 +10,58 @@ import sys
 import rasterio
 from rasterio.merge import merge
 import os
+import numpy as np
 
 '''
-This code helps to scaling factor boi and save the metadata file
+This code helps to scale factor bovl and save the metadata file, as a part of ionospheric correction in licsar2licsbas
 Nergizci 05/11/2024
 '''
 
-if len(sys.argv) < 1:
-    print('Please provide pair information (assuming you run this in your BATCH_CACHE_DIR/frame)')
-    print('e.g. python bscaling_tif.py 20230129_20230210')
+# Get the current working directory (assumed to be GEOC)
+GEOCdir = os.getcwd()
+framedir = os.path.dirname(GEOCdir)
+frame = os.path.basename(framedir)
+
+# Standard frame name pattern in LiCS (e.g., 116A_05207_252525)
+frame_pattern = r"^\d{3}[AD]_\d{5}_\d{6}$"
+# print(f"Checking directories:\n - GEOCdir: {GEOCdir}\n - framedir: {framedir}\n - frame: {frame}")
+
+if not re.match(frame_pattern, frame):
+    print("Please check where you are running the script. It should be in the GEOC folder with a correctly formatted frame name.")
     sys.exit(1)
 
+# Define metadata file path
+tr = int(frame[:3])
+metadir = os.path.join(os.environ['LiCSAR_public'], str(tr), frame, 'metadata')
+metafile = os.path.join(metadir, 'metadata.txt')
 
-##variables
-tempdir = os.getcwd()
-frame = os.path.basename(tempdir)
-framedir = tempdir
-pair=sys.argv[1]
-prime, second = pair.split('_')
-tr= int(frame[:3])
-GEOC_folder=os.path.join(framedir, 'GEOC')
-RSLC_folder=os.path.join(framedir, 'RSLC')
+# Extract primary epoch from metadata
+try:
+    primepoch = misc.grep1line('master=', metafile).split('=')[1]
+    path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'SLC', primepoch)
+except Exception as e:
+    print(f"Error reading metadata file: {e}")
+    sys.exit(1)
 
-tif=os.path.join(GEOC_folder,pair,pair+'.geo.bovldiff.adf.tif')
-outtif=os.path.join(GEOC_folder,pair,pair+'.geo.boi_scaling.tif')
+# Find a valid pair with the required file
+pair = None
+for pairs in os.listdir(GEOCdir):
+    pair_dir = os.path.join(GEOCdir, pairs)
+    if os.path.isdir(pair_dir):
+        bovl_tif = os.path.join(pair_dir, f"{pairs}.geo.bovldiff.adf.mm.tif")
+        if os.path.exists(bovl_tif) and os.path.getsize(bovl_tif) > 0:
+            pair = pairs
+            print(f"Found matching pair: {pair}")
+            break
 
-if not os.path.exists(tif):
-    print('the file does not exist here, trying to find it in batchdir')
-    batch=os.environ['BATCH_CACHE_DIR']
-    tif=os.path.join(batch,frame,'GEOC',pair,pair+'.geo.bovldiff.adf.tif')
-    outtif = os.path.join(batch, frame,'GEOC',pair,pair+'.geo.boi_scaling.tif')
+# Check if a valid pair was found
+if pair is None:
+    print("No valid interferogram pair found containing 'geo.bovldiff.adf.mm.tif'.")
+    sys.exit(1)
 
-if not os.path.exists(tif):
-    print('ERROR, the file does not exist in:')
-    print(tif)
-    exit()
-
-
-metafile = os.path.join(os.environ['LiCSAR_public'], str(tr), frame, 'metadata', 'metadata.txt')
-primepoch = misc.grep1line('master=',metafile).split('=')[1]
-path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'SLC', primepoch)
+# Define input and output TIFF files
+tif = os.path.join(GEOCdir, pair, f"{pair}.geo.bovldiff.adf.tif")
+outtif = os.path.join(GEOCdir, f"{pair}.geo.bovl_scaling.tif")
 
 ###Lazecky conncomps idea
 bovlpha=load_tif2xr(tif)
@@ -88,8 +99,6 @@ dfDCs=dl.get_dfDC(path_to_slcdir, f0=5405000500, burst_interval=2.758277, return
 scaling_factors = dict()
 for sw in sw_overlaps_dict.keys():
     scaling_factors[sw] = (az_res*PRF) / (dfDCs[sw-1]* 2 * np.pi)
-
-print('dfDCs have been calculated, please wait....')
 
 tif_list = []
 outbovl = bovlpha*0
