@@ -40,7 +40,7 @@ metafile = os.path.join(metadir, 'metadata.txt')
 # Extract primary epoch from metadata
 try:
     primepoch = misc.grep1line('master=', metafile).split('=')[1]
-    path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'RSLC', primepoch)
+    path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'SLC', primepoch)
 except Exception as e:
     print(f"Error reading metadata file: {e}")
     sys.exit(1)
@@ -145,13 +145,12 @@ if not os.path.exists(outtif):
 else:
     print(f"Output file for bovl scaling already exists.")
 
-
+###TODO! as soon as possible bovl scaling factor should be changed and calculated as pixel base like get_sf_array function.!!!!
 
 ####getting the sscaling tif
-geoc_tif=os.path.join(GEOCdir, f"{pair}.geo.sbovl_scaling.tif")
+geoc_tif=os.path.join(GEOCdir, f"{pair}.geo.sovl_scaling.tif")
 if os.path.exists(geoc_tif):
     print(f"Output file for sovl scaling already exists.")
-    sys.exit(0) 
 lt_fine_suffix='lt_fine'
 LiCSAR_procdir = os.environ['LiCSAR_procdir']
 geo_dir= os.path.join(LiCSAR_procdir,str(tr),frame,'geo')
@@ -184,6 +183,7 @@ except Exception as e:
     sys.exit(1)
 
 ###scaling_calc
+path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'RSLC', primepoch) ##make the dfDC and get_sf_array SLC path
 sf_array=get_sf_array(path_to_slcdir, f0=5405000500, burst_interval=2.758277)
 sf_array[sf_array==0]=np.nan
 sf_array=sf_array*1000
@@ -191,7 +191,7 @@ scaling_factor_file = os.path.join(GEOCdir, f"{pair}.sovl_scaling")
 sf_array.astype(np.float32).byteswap().tofile(scaling_factor_file)
 
 ##geocoding gamma style
-geoc_file=os.path.join(GEOCdir, f"{pair}.geo.sbovl_scaling")
+geoc_file=os.path.join(GEOCdir, f"{pair}.geo.sovl_scaling")
 exec_str=['geocode_back', scaling_factor_file, str(width), lt_fine_file, geoc_file, str(widthgeo), '0', '0', '0']
 try:
   subprocess.run(exec_str, check=True, stdout=subprocess.DEVNULL)
@@ -199,10 +199,42 @@ try:
 except subprocess.CalledProcessError as e:
   print(f"An error occurred while executing the command: {e}")
     
-#geoc_tif=os.path.join(GEOCdir, f"{pair}.geo.sbovl_scaling.tif")
+#geoc_tif=os.path.join(GEOCdir, f"{pair}.geo.sovl_scaling.tif")
 exec_str=['data2geotiff', EQA_path, geoc_file,'2', geoc_tif, '0.0']
 try:
   subprocess.run(exec_str, check=True, stdout=subprocess.DEVNULL)
   # print(f"Command executed successfully: {' '.join(exec_str)}")
 except subprocess.CalledProcessError as e:
   print(f"An error occurred while executing the command: {e}")
+
+##let's merge them?
+# Define the paths
+bovl_path = os.path.join(GEOCdir, pair + '.geo.bovl_scaling.tif')
+sovl_path = os.path.join(GEOCdir, pair + '.geo.sovl_scaling.tif')
+output_path = os.path.join(GEOCdir, pair + '.geo.sbovl_scaling.tif')
+
+if not os.path.exists(output_path):
+    # Open input GeoTIFF files
+    if os.path.exists(bovl_path):
+        bovl = open_geotiff(bovl_path, fill_value=np.nan)
+    else:
+        print(f"{bovl_path} doesn't exist, something wrong!")
+        sys.exit(1)
+        
+    if os.path.exists(sovl_path):
+        sovl = open_geotiff(sovl_path, fill_value=np.nan)
+    else:
+        print(f"{sovl_path} doesn't exist, something wrong!")
+        sys.exit(1)
+
+
+    # Process the data
+    super_sbovl = bovl.copy()
+    super_sbovl[super_sbovl==0]= np.nan
+    sovl[sovl==0]= np.nan
+    super_sbovl[np.isnan(super_sbovl)] = sovl[np.isnan(super_sbovl)]
+
+    # Export the result to a GeoTIFF
+    export_to_tiff(output_path, super_sbovl, bovl_path)
+else:
+    print(f"Output file for sbovl scaling already exists.")
