@@ -37,6 +37,13 @@ tr = int(frame[:3])
 metadir = os.path.join(os.environ['LiCSAR_public'], str(tr), frame, 'metadata')
 metafile = os.path.join(metadir, 'metadata.txt')
 
+##check if in the metadata is there a file as finished as 
+
+for files in os.listdir(metadir):
+    if '.geo.sbovl_scaling.tif' in files:
+        print(f"{files} sbovl scaling is already exist in metadata folder. No need to run the script.")
+        sys.exit(1)
+        
 # Extract primary epoch from metadata
 try:
     primepoch = misc.grep1line('master=', metafile).split('=')[1]
@@ -58,7 +65,7 @@ for pairs in os.listdir(GEOCdir):
 
 # Check if a valid pair was found
 if pair is None:
-    print("No valid interferogram pair found containing 'geo.bovldiff.adf.mm.tif'.")
+    print("No valid interferogram pair found containing 'geo.bovldiff.adf.mm.tif'. Contact with Muhammet Nergizci(eemne@leeds.ac.uk) or Milan Lazecky.")
     sys.exit(1)
 
 # Define input and output TIFF files
@@ -147,66 +154,82 @@ else:
 
 ###TODO! as soon as possible bovl scaling factor should be changed and calculated as pixel base like get_sf_array function.!!!!
 
-####getting the sscaling tif
-geoc_tif=os.path.join(GEOCdir, f"{pair}.geo.sovl_scaling.tif")
-if os.path.exists(geoc_tif):
-    print(f"Output file for sovl scaling already exists.")
-lt_fine_suffix='lt_fine'
-LiCSAR_procdir = os.environ['LiCSAR_procdir']
-geo_dir= os.path.join(LiCSAR_procdir,str(tr),frame,'geo')
-if os.path.exists(geo_dir) and os.path.isdir(geo_dir):
-  for file in os.listdir(geo_dir):
-    if file.endswith(lt_fine_suffix):
-      lt_fine_file=os.path.join(geo_dir, file) 
+# Getting the scaling TIFF
+geoc_tif = os.path.join(GEOCdir, f"{pair}.geo.sovl_scaling.tif")
 
-  EQA_path=os.path.join(geo_dir, 'EQA.dem_par')
-  EQA_par=pg.ParFile(EQA_path)
-  widthgeo=EQA_par.get_value('width', dtype = int, index= 0)
-else:
-  print(f'geo folder doesnt exists. Please check your {framedir}')
-mli_par_path = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'SLC', primepoch, primepoch + '.slc.mli.par')
-##the mli_par_path should be exist, othercase can't work properly!
-try:
-    if os.path.exists(mli_par_path):
-        with open(mli_par_path, 'r') as mli_par:
-            for line in mli_par:
-                if line.startswith('range_samples'):
-                    width = int(line.split(':')[-1].strip())
-                elif line.startswith('azimuth_lines'):
-                    az_line = int(line.split(':')[-1].strip())
+if not os.path.exists(geoc_tif):
+    lt_fine_suffix = 'lt_fine'
+    LiCSAR_procdir = os.environ['LiCSAR_procdir']
+    geo_dir = os.path.join(LiCSAR_procdir, str(tr), frame, 'geo')
+
+    if os.path.exists(geo_dir) and os.path.isdir(geo_dir):
+        for file in os.listdir(geo_dir):
+            if file.endswith(lt_fine_suffix):
+                lt_fine_file = os.path.join(geo_dir, file)
+
+        EQA_path = os.path.join(geo_dir, 'EQA.dem_par')
+        EQA_par = pg.ParFile(EQA_path)
+        widthgeo = EQA_par.get_value('width', dtype=int, index=0)
     else:
-        print(f'mli par does not exist. Please check the path: {mli_par_path}')
+        print(f'Geo folder does not exist. Please check your {framedir}')
+
+    mli_par_path = os.path.join(
+        os.environ['LiCSAR_procdir'], str(tr), frame, 'SLC', primepoch, primepoch + '.slc.mli.par'
+    )
+
+    # The mli_par_path should exist; otherwise, the script cannot proceed properly.
+    try:
+        if os.path.exists(mli_par_path):
+            with open(mli_par_path, 'r') as mli_par:
+                for line in mli_par:
+                    if line.startswith('range_samples'):
+                        width = int(line.split(':')[-1].strip())
+                    elif line.startswith('azimuth_lines'):
+                        az_line = int(line.split(':')[-1].strip())
+        else:
+            print(f'MLI parameter file does not exist. Please check the path: {mli_par_path}')
+            sys.exit(1)
+
+    except Exception as e:
+        print(f'An error occurred: {e}')
         sys.exit(1)
 
-except Exception as e:
-    print(f'An error occurred: {e}')
-    sys.exit(1)
+    # Scaling calculation
+    path_to_slcdir = os.path.join(
+        os.environ['LiCSAR_procdir'], str(tr), frame, 'RSLC', primepoch
+    )  # Make the dfDC and get_sf_array SLC path
 
-###scaling_calc
-path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'RSLC', primepoch) ##make the dfDC and get_sf_array SLC path
-sf_array=get_sf_array(path_to_slcdir, f0=5405000500, burst_interval=2.758277)
-sf_array[sf_array==0]=np.nan
-sf_array=sf_array*1000
-scaling_factor_file = os.path.join(GEOCdir, f"{pair}.sovl_scaling")
-sf_array.astype(np.float32).byteswap().tofile(scaling_factor_file)
+    sf_array = get_sf_array(path_to_slcdir, f0=5405000500, burst_interval=2.758277)
+    sf_array[sf_array == 0] = np.nan
+    sf_array = sf_array * 1000
 
-##geocoding gamma style
-geoc_file=os.path.join(GEOCdir, f"{pair}.geo.sovl_scaling")
-exec_str=['geocode_back', scaling_factor_file, str(width), lt_fine_file, geoc_file, str(widthgeo), '0', '0', '0']
-try:
-  subprocess.run(exec_str, check=True, stdout=subprocess.DEVNULL)
-  # print(f"Command executed successfully: {' '.join(exec_str)}")
-except subprocess.CalledProcessError as e:
-  print(f"An error occurred while executing the command: {e}")
+    scaling_factor_file = os.path.join(GEOCdir, f"{pair}.sovl_scaling")
+    sf_array.astype(np.float32).byteswap().tofile(scaling_factor_file)
+
+    # Geocoding in GAMMA style
+    geoc_file = os.path.join(GEOCdir, f"{pair}.geo.sovl_scaling")
+
+    exec_str = [
+        'geocode_back', scaling_factor_file, str(width), lt_fine_file,
+        geoc_file, str(widthgeo), '0', '0', '0'
+    ]
+
+    try:
+        subprocess.run(exec_str, check=True, stdout=subprocess.DEVNULL)
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while executing the command: {e}")
+
+    # Convert to GeoTIFF
+    exec_str = ['data2geotiff', EQA_path, geoc_file, '2', geoc_tif, '0.0']
+
+    try:
+        subprocess.run(exec_str, check=True, stdout=subprocess.DEVNULL)
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while executing the command: {e}")
+
+else:
+    print(f"Output file for sovl scaling already exists.")
     
-#geoc_tif=os.path.join(GEOCdir, f"{pair}.geo.sovl_scaling.tif")
-exec_str=['data2geotiff', EQA_path, geoc_file,'2', geoc_tif, '0.0']
-try:
-  subprocess.run(exec_str, check=True, stdout=subprocess.DEVNULL)
-  # print(f"Command executed successfully: {' '.join(exec_str)}")
-except subprocess.CalledProcessError as e:
-  print(f"An error occurred while executing the command: {e}")
-
 ##let's merge them?
 # Define the paths
 bovl_path = os.path.join(GEOCdir, pair + '.geo.bovl_scaling.tif')
@@ -238,3 +261,17 @@ if not os.path.exists(output_path):
     export_to_tiff(output_path, super_sbovl, bovl_path)
 else:
     print(f"Output file for sbovl scaling already exists.")
+    
+    
+##copy the file to metadata!
+metadata_output_path = os.path.join(metadir, pair + '.geo.sbovl_scaling.tif')
+if os.path.exists(output_path) and not os.path.exists(metadata_output_path):
+    shutil.copy(output_path, metadata_output_path)
+    print(f"Copied {output_path} to {metadata_output_path}")
+
+##remove the temporary files
+for i in os.listdir(GEOCdir):
+    if '.bovl_scaling' in i or '.sovl_scaling' in i:
+        print(i)
+        os.remove(os.path.join(GEOCdir, i))
+        print(f"Removed {i}")
