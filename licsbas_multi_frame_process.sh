@@ -78,13 +78,13 @@ while read -r i; do
 
     tmux_command=""
     if [[ -n "$local_flag" ]]; then
-        tmux_command="licsbas_local; "
+        tmux_command="local_mn; "
     fi
 
     if [[ "$sboi_flag" == "--sbovl" && -n "$eqoff_flag" ]]; then
-        tmux_command+="licsar2licsbas_testing.sh -W -M 10 -b -n 4 -T -E 6 '$i' '$start_date' '$end_date'"
+        tmux_command+="licsar2licsbas.sh -W -M 10 -b -n 4 -T -i -e -O -E 6 '$i' '$start_date' '$end_date'"
     elif [[ "$sboi_flag" == "--sbovl" ]]; then
-        tmux_command+="licsar2licsbas_testing.sh -W -M 10 -b -n 4 -T '$i' '$start_date' '$end_date'"
+        tmux_command+="licsar2licsbas.sh -W -M 10 -b -n 4 -T -i -e -O '$i' '$start_date' '$end_date'"
     elif [[ -n "$eqoff_flag" ]]; then
         tmux_command+="licsar2licsbas.sh -M 10 -g -n 4 -W -N -T -i -e -u -t 0 -C 0.2 -d -E 6 -p '$i' '$start_date' '$end_date'"
     else

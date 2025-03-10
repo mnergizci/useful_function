@@ -327,8 +327,8 @@ if [ $DOGEOC -eq 1 ]; then
   echo "Moving geoifgs to public folder for frame "$frame
   track=$tr
   for geoifg in `ls $frame/GEOC/20??????_20?????? -d | rev | cut -d '/' -f1 | rev`; do
-   if [ -f $frame/GEOC/$geoifg/$geoifg.geo.unw.tif ]; then
-    if [ -f $pubDir_ifgs/$geoifg/$geoifg.geo.unw.tif ]; then 
+   if [[ -f $frame/GEOC/$geoifg/$geoifg.geo.unw.tif || -f $frame/GEOC/$geoifg/$geoifg.geo.bovldiff.adf.mm.tif ]]; then
+    if [[ -f $pubDir_ifgs/$geoifg/$geoifg.geo.unw.tif || -f $pubDir_ifgs/$geoifg/$geoifg.geo.bovldiff.adf.mm.tif ]]; then 
       if [ $GEOC_OVERWRITE == 1 ]; then
        echo "warning, geoifg "$geoifg" already exists. Data will be overwritten";
        updated=1

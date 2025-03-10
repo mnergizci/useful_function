@@ -16,7 +16,7 @@ from modules_sw_mn import * #functions saved here
 
 '''
 This code helps to scale factor bovl and save the metadata file, as a part of ionospheric correction in licsar2licsbas
-Nergizci 05/11/2024
+Nergizci 05/11/2025
 '''
 
 # Get the current working directory (assumed to be GEOC)
