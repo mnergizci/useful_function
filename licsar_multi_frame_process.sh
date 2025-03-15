@@ -81,9 +81,9 @@ while read -r i; do
 
     # Determine command based on batch mode flag
     if [ "$batch_mode" = true ]; then
-        run_command="batch2; licsar_make_frame.sh -f '$i' 0 1 '$start_date' '$end_date'"
+        run_command="batch2; licsar_make_frame.sh -f '$i' 0 1 '$start_date' '$end_date' -D "
     else
-        run_command="batch3; licsar_make_frame.sh -f '$i' 0 1 '$start_date' '$end_date'"
+        run_command="batch3; licsar_make_frame.sh -f '$i' 0 1 '$start_date' '$end_date' -D"
     fi
 
     tmux new-session -d -s "$session_name" \
