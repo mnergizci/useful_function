@@ -254,8 +254,8 @@ if not os.path.exists(output_path):
     # Process the data
     super_sbovl = bovl.copy()
     super_sbovl[super_sbovl==0]= np.nan
-    sovl[sovl==0]= np.nan
-    super_sbovl[np.isnan(super_sbovl)] = sovl[np.isnan(super_sbovl)]
+    # sovl[sovl==0]= np.nan   #let's keep out the sovl as the ionospheric correction is not specified yet for them. 
+    # super_sbovl[np.isnan(super_sbovl)] = sovl[np.isnan(super_sbovl)]
 
     # Export the result to a GeoTIFF
     export_to_tiff(output_path, super_sbovl, bovl_path)
